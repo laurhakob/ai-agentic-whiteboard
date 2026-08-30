@@ -15,6 +15,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
 import { useUser } from "@clerk/nextjs";
+import CreateNewBoardDialog from "./CreateNewBoardDialog";
 
 export function AppSidebar() {
   const path = usePathname();
@@ -30,7 +31,7 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <Button>+ Create New Board</Button>
+          <CreateNewBoardDialog  />
         </SidebarGroup>
 
         <SidebarGroup>
@@ -68,7 +69,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <Button>+ Create New Board</Button>
+       <CreateNewBoardDialog  />
         <div className="p-4 my-3 border rounded-md mb-1">
           <h2 className="text-sm flex justify-between">
             2 files created <span>total 3</span>
