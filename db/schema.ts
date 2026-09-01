@@ -1,5 +1,6 @@
 import {
   integer,
+  jsonb,
   pgTable,
   serial,
   text,
@@ -15,20 +16,24 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// export const posts = pgTable("posts", {
-//   id: serial("id").primaryKey(),
-//   title: text("title").notNull(),
-//   content: text("content"),
-//   authorId: serial("author_id").references(() => users.id),
-//   createdAt: timestamp("created_at").defaultNow().notNull(),
-// });
-
 export const projects = pgTable("projects", {
   id: serial("id").primaryKey(),
   projectId: varchar("projectId").notNull().unique(),
   projectName: varchar("projectName").notNull(),
   userEmail: varchar("userEmail").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const WhiteboardData = pgTable("whiteboardData", {
+  id: serial("id").primaryKey(),
+  projectId: varchar("projectid")
+    .notNull()
+    .unique()
+    .references(() => projects.projectId),
+  elements: jsonb("elements"),
+  appState: jsonb("appState"),
+  files: jsonb("files"),
+  updatedAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export type User = typeof users.$inferSelect;
