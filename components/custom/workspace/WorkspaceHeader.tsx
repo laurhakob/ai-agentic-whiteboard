@@ -3,7 +3,7 @@ import Image from "next/image";
 import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Save, Share } from "lucide-react";
+import { DownloadIcon, Save, Share } from "lucide-react";
 
 type Props = {
   selectedTab: any;
@@ -35,6 +35,9 @@ function WorkspaceHeader({ selectedTab }: Props) {
         </Button>
         <Button variant={"outline"}>
           <Share /> Share
+        </Button>
+        <Button  variant={"outline"}>
+          <DownloadIcon /> Export
         </Button>
       </div>
     </div>

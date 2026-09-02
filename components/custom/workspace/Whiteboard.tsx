@@ -216,7 +216,7 @@
 // export default Whiteboard;
 
 "use client";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import "@excalidraw/excalidraw/index.css";
 import axios from "axios";
@@ -233,11 +233,14 @@ import {
   Minus,
   MousePointer2,
   Pencil,
+  Sparkles,
   Square,
   Type,
 } from "lucide-react";
 import { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import FloatingProperties from "./FloatingProperties";
+import AIFloatingSidebar from "./AIFloatingSidebar";
+import { Button } from "@/components/ui/button";
 
 const tools = [
   {
@@ -302,14 +305,84 @@ const Excalidraw = dynamic(
   { ssr: false }
 );
 
+// `collaborators` is a Map and the pointer/cursor fields are transient, so they
+// can't survive a JSON round trip. Keep only what is worth restoring.
+const sanitizeAppState = (appState: any) => {
+  if (!appState) return undefined;
+
+  const {
+    collaborators,
+    cursorButton,
+    draggingElement,
+    editingElement,
+    resizingElement,
+    selectionElement,
+    ...rest
+  } = appState;
+
+  return rest;
+};
+
 function Whiteboard() {
   const [excalidrawAPI, setExcalidrawAPI] =
     useState<ExcalidrawImperativeAPI | null>(null);
   const saveTimeRef = useRef<any>(null);
-  const { projectid } = useParams();
+  const pendingSaveRef = useRef<any>(null);
+  const params = useParams();
+  const projectId = params?.projectId as string | undefined;
   const [activeTool, setActiveTool] = useState("selection");
   const [selectedElement, setSelectedElement] = useState<any>(null);
   const [canvasState, setCanvasState] = useState<any>(null);
+  const [showAiSidebar, setShowAiSidebar] = useState(false);
+  const [initialData, setInitialData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load the saved scene before mounting Excalidraw, so a refresh restores it.
+  useEffect(() => {
+    if (!projectId) return;
+
+    let cancelled = false;
+
+    const loadCanvas = async () => {
+      try {
+        const result = await axios.get("/api/whiteboard", {
+          params: { projectId: projectId },
+        });
+
+        if (cancelled) return;
+
+        const data = result.data;
+
+        setInitialData({
+          elements: data?.elements ?? [],
+          appState: sanitizeAppState(data?.appState),
+          files: data?.files ?? {},
+          scrollToContent: true,
+        });
+      } catch (e) {
+        if (!cancelled) setInitialData({ elements: [], files: {} });
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    loadCanvas();
+
+    return () => {
+      cancelled = true;
+
+      // Unmounting (e.g. switching to the doc tab) shouldn't drop a pending save.
+      if (saveTimeRef.current) {
+        clearTimeout(saveTimeRef.current);
+        saveTimeRef.current = null;
+
+        if (pendingSaveRef.current) {
+          const { elements, appState, files } = pendingSaveRef.current;
+          SaveCanvasChanges(elements, appState, files);
+        }
+      }
+    };
+  }, [projectId]);
 
   const handleCanvasChange = (
     elements: readonly any[],
@@ -328,19 +401,23 @@ function Whiteboard() {
       setSelectedElement(null);
     }
 
+    // Don't persist anything until the saved scene has been loaded,
+    // otherwise the initial empty canvas overwrites it.
+    if (isLoading) return;
+
     //Cancel Prev Timer
     if (saveTimeRef?.current) {
       clearTimeout(saveTimeRef.current);
     }
 
-    //Start New 10 Second Timer
+    pendingSaveRef.current = { elements, appState, files };
+
+    //Start New Timer
     saveTimeRef.current = setTimeout(() => {
-      //   SaveCanvasChanges(elements, appState, files);
-      //   toast.add({
-      //     title: "Changes Saved",
-      //     type: "success",
-      //   });
-    }, 10000);
+      saveTimeRef.current = null;
+      pendingSaveRef.current = null;
+      SaveCanvasChanges(elements, appState, files);
+    }, 2000);
   };
 
   const SaveCanvasChanges = async (
@@ -348,12 +425,21 @@ function Whiteboard() {
     appState: any,
     files: any
   ) => {
-    const result = await axios.post("/api/whiteboard", {
-      elements: elements,
-      appState: appState,
-      files: files,
-      projectId: projectid,
-    });
+    if (!projectId) return;
+
+    try {
+      await axios.post("/api/whiteboard", {
+        elements: elements,
+        appState: sanitizeAppState(appState),
+        files: files ?? {},
+        projectId: projectId,
+      });
+    } catch (e) {
+      toast.add({
+        title: "Failed to save changes",
+        type: "error",
+      });
+    }
   };
 
   const changeTool = (tool: any) => {
@@ -488,11 +574,23 @@ function Whiteboard() {
 
   const floatingPosition = getFloatingPosition();
 
+  if (isLoading) {
+    return (
+      <div
+        className="flex items-center justify-center text-sm text-muted-foreground"
+        style={{ height: "90vh" }}
+      >
+        Loading board...
+      </div>
+    );
+  }
+
   return (
-    <div style={{ height: "90vh" }}>
+    <div className="relative" style={{ height: "90vh" }}>
       <Excalidraw
         //@ts-ignore
         excalidrawAPI={(api) => setExcalidrawAPI(api)}
+        initialData={initialData}
         onChange={handleCanvasChange}
       />
       <div className="absolute left-4 top-1/2 z-50 -translate-y-1/2 flex flex-col gap-1 rounded-2xl bg-white border p-1.5 shadow-xl">
@@ -522,6 +620,29 @@ function Whiteboard() {
           handlePropertyChange(property, value)
         }
       />
+
+      <div className="absolute right-15 bottom-7 z-50">
+        <Button size={"lg"} onClick={() => setShowAiSidebar(!showAiSidebar)}>
+          <Sparkles /> AI
+        </Button>
+      </div>
+
+      {/* {showAiSidebar && (
+        <AIFloatingSidebar
+          excalidrawApi={excalidrawAPI}
+          onClose={() => setShowAiSidebar(false)}
+          onGenerate={async (tool, prompt) => {
+            console.log(tool, prompt);
+          }}
+        />
+      )} */}
+
+      {showAiSidebar && (
+        <AIFloatingSidebar
+          excalidrawApi={excalidrawAPI}
+          onClose={() => setShowAiSidebar(false)}
+        />
+      )}
     </div>
   );
 }
