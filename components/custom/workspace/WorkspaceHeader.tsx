@@ -1,3 +1,4 @@
+
 "use client";
 import Image from "next/image";
 import React from "react";
@@ -6,10 +7,12 @@ import { Button } from "@/components/ui/button";
 import { DownloadIcon, Save, Share } from "lucide-react";
 
 type Props = {
-  selectedTab: any;
+  selectedTab: (value: string) => void;
+  onExport?: () => void;
+  canExport?: boolean;
 };
 
-function WorkspaceHeader({ selectedTab }: Props) {
+function WorkspaceHeader({ selectedTab, onExport, canExport = true }: Props) {
   return (
     <div className="p-3 border-b flex justify-between">
       <div className="flex gap-2 items-center">
@@ -36,7 +39,7 @@ function WorkspaceHeader({ selectedTab }: Props) {
         <Button variant={"outline"}>
           <Share /> Share
         </Button>
-        <Button  variant={"outline"}>
+        <Button onClick={onExport} disabled={!canExport} variant={"outline"}>
           <DownloadIcon /> Export
         </Button>
       </div>
