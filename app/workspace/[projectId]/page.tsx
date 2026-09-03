@@ -5,11 +5,44 @@ import Whiteboard from "@/components/custom/workspace/Whiteboard";
 import WorkspaceHeader from "@/components/custom/workspace/WorkspaceHeader";
 import { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { toast } from "@/components/ui/toast";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import axios from "axios";
 
 function Workspace() {
   const [activeTab, setActiveTab] = useState("whiteboard");
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
+  const [projectName, setProjectName] = useState<string | undefined>(undefined);
+
+  const params = useParams();
+  const projectId = params?.projectId as string | undefined;
+
+  // The board's real name for the header, instead of a hardcoded placeholder.
+  useEffect(() => {
+    if (!projectId) return;
+
+    let cancelled = false;
+
+    const loadProject = async () => {
+      try {
+        const result = await axios.get("/api/projects", {
+          params: { projectId: projectId },
+        });
+
+        if (!cancelled) {
+          setProjectName(result.data?.projectName ?? "Untitled board");
+        }
+      } catch (e) {
+        if (!cancelled) setProjectName("Untitled board");
+      }
+    };
+
+    loadProject();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
 
   const handleExportImage = async () => {
     if (!api) return;
@@ -51,6 +84,7 @@ function Workspace() {
         selectedTab={(value: string) => setActiveTab(value)}
         onExport={handleExportImage}
         canExport={activeTab === "whiteboard" && !!api}
+        projectName={projectName}
       />
 
       {activeTab == "whiteboard" ? (

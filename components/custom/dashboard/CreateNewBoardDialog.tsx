@@ -55,10 +55,10 @@ function CreateNewBoardDialog() {
 
   return (
     <Dialog open={dialog} onOpenChange={setDialog}>
-      <DialogTrigger>
-        <Button className="w-full">
-          <Plus /> Create New Board
-        </Button>
+      {/* `render` merges the trigger into the Button rather than wrapping it,
+          which would nest a <button> inside a <button>. */}
+      <DialogTrigger render={<Button className="w-full" />}>
+        <Plus /> Create New Board
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
@@ -77,9 +77,7 @@ function CreateNewBoardDialog() {
           />
         </div>
         <DialogFooter>
-          <DialogClose>
-            <Button variant="outline">Cancel</Button>
-          </DialogClose>
+          <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
 
           <Button
             disabled={workspaceName?.length == 0 || loading}
