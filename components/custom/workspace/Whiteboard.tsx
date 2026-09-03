@@ -23,6 +23,8 @@ import {
 import { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import FloatingProperties from "./FloatingProperties";
 import AIFloatingSidebar from "./AIFloatingSidebar";
+import CanvasDock from "./CanvasDock";
+import { restoreNoteTextDefaults, updateBoundText } from "@/lib/canvas";
 import { Button } from "@/components/ui/button";
 
 const tools = [
@@ -82,6 +84,8 @@ const tools = [
     color: "text-rose-500",
   },
 ];
+
+const SAVE_DEBOUNCE_MS = 10000;
 
 const Excalidraw = dynamic(
   async () => (await import("@excalidraw/excalidraw")).Excalidraw,
@@ -178,7 +182,8 @@ function Whiteboard({ onApiReady }: Props) {
 
         if (pendingSaveRef.current) {
           const { elements, appState, files } = pendingSaveRef.current;
-          SaveCanvasChanges(elements, appState, files);
+          // Silent: the board is going away, a success toast here is just noise.
+          SaveCanvasChanges(elements, appState, files, { notify: false });
         }
       }
     };
@@ -190,6 +195,10 @@ function Whiteboard({ onApiReady }: Props) {
     files: any
   ) => {
     setCanvasState(appState);
+
+    // A note temporarily points the "current item" defaults at its own text
+    // styling; hand them back as soon as its editor closes.
+    restoreNoteTextDefaults(excalidrawAPI, appState);
 
     const selectedIds = Object.keys(appState.selectedElementIds || {});
 
@@ -217,15 +226,18 @@ function Whiteboard({ onApiReady }: Props) {
       saveTimeRef.current = null;
       pendingSaveRef.current = null;
       SaveCanvasChanges(elements, appState, files);
-    }, 2000);
+    }, SAVE_DEBOUNCE_MS);
   };
 
   const SaveCanvasChanges = async (
     elements: readonly any[],
     appState: any,
-    files: any
+    files: any,
+    options?: { notify?: boolean }
   ) => {
     if (!projectId) return;
+
+    const notify = options?.notify ?? true;
 
     try {
       await axios.post("/api/whiteboard", {
@@ -234,6 +246,14 @@ function Whiteboard({ onApiReady }: Props) {
         files: files ?? {},
         projectId: projectId,
       });
+
+      // Only after the request actually succeeds.
+      if (notify) {
+        toast.add({
+          title: "Changes Saved",
+          type: "success",
+        });
+      }
     } catch (e) {
       toast.add({
         title: "Failed to save changes",
@@ -275,6 +295,36 @@ function Whiteboard({ onApiReady }: Props) {
     });
 
     setSelectedElement({ ...selectedElement, [property]: value });
+  };
+
+  // The text inside a note lives in its own element, bound to the container.
+  // Selecting the note selects the container, so text styling has to be routed
+  // to that bound element rather than to whatever is selected.
+  const boundTextElement = (() => {
+    if (!excalidrawAPI || !selectedElement) return null;
+
+    const textId = selectedElement.boundElements?.find(
+      (bound: any) => bound.type === "text"
+    )?.id;
+
+    if (!textId) return null;
+
+    return (
+      excalidrawAPI
+        .getSceneElements()
+        .find((element: any) => element.id === textId) ?? null
+    );
+  })();
+
+  const handleTextPropertyChange = async (property: string, value: any) => {
+    if (!excalidrawAPI || !boundTextElement) return;
+
+    await updateBoundText(excalidrawAPI, selectedElement, boundTextElement, {
+      [property]: value,
+    });
+
+    // Nudge the selection so the toolbar re-reads the new value.
+    setSelectedElement({ ...selectedElement });
   };
 
   const handleDeleteElement = () => {
@@ -413,6 +463,8 @@ function Whiteboard({ onApiReady }: Props) {
 
       <FloatingProperties
         selectedElement={selectedElement}
+        boundText={boundTextElement}
+        onTextPropertyChange={handleTextPropertyChange}
         position={floatingPosition}
         onDelete={handleDeleteElement}
         onDuplicate={handleDuplicateElement}
@@ -424,7 +476,14 @@ function Whiteboard({ onApiReady }: Props) {
         }
       />
 
-      <div className="absolute right-15 bottom-7 z-50">
+      <CanvasDock
+        excalidrawApi={excalidrawAPI}
+        aiOpen={showAiSidebar}
+        onToggleAi={() => setShowAiSidebar((open) => !open)}
+      />
+
+      {/* bottom-3.5 lines this up with the centre of Excalidraw's help button */}
+      <div className="absolute right-15 bottom-3.5 z-50">
         <Button size={"lg"} onClick={() => setShowAiSidebar(!showAiSidebar)}>
           <Sparkles /> AI
         </Button>

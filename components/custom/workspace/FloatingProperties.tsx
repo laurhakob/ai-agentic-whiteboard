@@ -27,6 +27,9 @@ import {
 
 type Props = {
   selectedElement: any;
+  /** Text bound inside the selected shape (a note's text), if any. */
+  boundText?: any;
+  onTextPropertyChange?: (property: string, value: any) => void;
   position: {
     left: number;
     top: number;
@@ -84,6 +87,8 @@ const TEXT_ALIGNS = [
 
 function FloatingProperties({
   selectedElement,
+  boundText,
+  onTextPropertyChange,
   position,
 
   onDelete,
@@ -158,6 +163,16 @@ function FloatingProperties({
   const hasFill = isShape;
   const hasStroke = isShape || isLine || isArrow || isFreeDraw;
 
+  // Either a plain text element, or the text bound inside a note. Both get the
+  // same font / size / alignment / colour controls.
+  const textElement = isText ? selectedElement : boundText;
+  const hasText = !!textElement;
+
+  const setTextProperty = (property: string, value: any) =>
+    isText
+      ? onPropertyChange?.(property, value)
+      : onTextPropertyChange?.(property, value);
+
   const togglePanel = (name: string) => {
     setOpenPanel((current) => (current === name ? null : name));
   };
@@ -225,7 +240,7 @@ function FloatingProperties({
           </IconButton>
         )}
 
-        {isText && (
+        {hasText && (
           <IconButton
             title="Alignment"
             active={openPanel === "align"}
@@ -273,12 +288,24 @@ function FloatingProperties({
       {/* ---------------- QUICK POPOVERS ---------------- */}
       {openPanel === "color" && (
         <Popover>
-          <SectionLabel>Stroke color</SectionLabel>
+          <SectionLabel>{isText ? "Text color" : "Stroke color"}</SectionLabel>
           <Swatches
             colors={COLORS}
             selected={selectedElement.strokeColor}
             onPick={(color) => onPropertyChange?.("strokeColor", color)}
           />
+
+          {/* A note has its own text inside it, coloured separately. */}
+          {hasText && !isText && (
+            <div className="mt-3">
+              <SectionLabel>Text color</SectionLabel>
+              <Swatches
+                colors={COLORS}
+                selected={textElement.strokeColor}
+                onPick={(color) => setTextProperty("strokeColor", color)}
+              />
+            </div>
+          )}
         </Popover>
       )}
 
@@ -294,19 +321,28 @@ function FloatingProperties({
         </Popover>
       )}
 
-      {openPanel === "align" && (
+      {openPanel === "align" && hasText && (
         <Popover>
           <SectionLabel>Alignment</SectionLabel>
           <div className="flex gap-2">
             {TEXT_ALIGNS.map(({ value, icon: Icon }) => (
               <OptionButton
                 key={value}
-                active={selectedElement.textAlign === value}
-                onClick={() => onPropertyChange?.("textAlign", value)}
+                active={textElement.textAlign === value}
+                onClick={() => setTextProperty("textAlign", value)}
               >
                 <Icon size={16} />
               </OptionButton>
             ))}
+          </div>
+
+          <div className="mt-3">
+            <SectionLabel>Size</SectionLabel>
+            <Select
+              value={textElement.fontSize ?? 20}
+              options={FONT_SIZES}
+              onChange={(v) => setTextProperty("fontSize", Number(v))}
+            />
           </div>
         </Popover>
       )}
@@ -358,7 +394,7 @@ function FloatingProperties({
             </div>
           </Section>
 
-          {isText && (
+          {hasText && (
             <>
               <Section>
                 <SectionLabel>Font</SectionLabel>
@@ -367,8 +403,8 @@ function FloatingProperties({
                     <OptionButton
                       key={f.value}
                       wide
-                      active={selectedElement.fontFamily === f.value}
-                      onClick={() => onPropertyChange?.("fontFamily", f.value)}
+                      active={textElement.fontFamily === f.value}
+                      onClick={() => setTextProperty("fontFamily", f.value)}
                     >
                       {f.label}
                     </OptionButton>
@@ -381,11 +417,9 @@ function FloatingProperties({
                   <div className="flex-1">
                     <SectionLabel>Size</SectionLabel>
                     <Select
-                      value={selectedElement.fontSize ?? 20}
+                      value={textElement.fontSize ?? 20}
                       options={FONT_SIZES}
-                      onChange={(v) =>
-                        onPropertyChange?.("fontSize", Number(v))
-                      }
+                      onChange={(v) => setTextProperty("fontSize", Number(v))}
                     />
                   </div>
 
@@ -395,8 +429,8 @@ function FloatingProperties({
                       {TEXT_ALIGNS.map(({ value, icon: Icon }) => (
                         <OptionButton
                           key={value}
-                          active={selectedElement.textAlign === value}
-                          onClick={() => onPropertyChange?.("textAlign", value)}
+                          active={textElement.textAlign === value}
+                          onClick={() => setTextProperty("textAlign", value)}
                         >
                           <Icon size={15} />
                         </OptionButton>
@@ -410,8 +444,8 @@ function FloatingProperties({
                 <SectionLabel>Text color</SectionLabel>
                 <Swatches
                   colors={COLORS}
-                  selected={selectedElement.strokeColor}
-                  onPick={(color) => onPropertyChange?.("strokeColor", color)}
+                  selected={textElement.strokeColor}
+                  onPick={(color) => setTextProperty("strokeColor", color)}
                 />
               </Section>
             </>
