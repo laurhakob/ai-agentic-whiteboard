@@ -1,4 +1,5 @@
 import {
+  boolean,
   integer,
   jsonb,
   pgTable,
@@ -21,6 +22,7 @@ export const projects = pgTable("projects", {
   projectId: varchar("projectId").notNull().unique(),
   projectName: varchar("projectName").notNull(),
   userEmail: varchar("userEmail").notNull(),
+  archived: boolean("archived").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

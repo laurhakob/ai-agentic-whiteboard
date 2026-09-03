@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import "@excalidraw/excalidraw/index.css";
 import axios from "axios";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { toast } from "@/components/ui/toast";
 import "./whiteboard.css";
 import {
@@ -120,11 +120,15 @@ function Whiteboard({ onApiReady }: Props) {
   const saveTimeRef = useRef<any>(null);
   const pendingSaveRef = useRef<any>(null);
   const params = useParams();
+  const searchParams = useSearchParams();
   const projectId = params?.projectId as string | undefined;
   const [activeTool, setActiveTool] = useState("selection");
   const [selectedElement, setSelectedElement] = useState<any>(null);
   const [canvasState, setCanvasState] = useState<any>(null);
-  const [showAiSidebar, setShowAiSidebar] = useState(false);
+  // ?ai=1 (from the dashboard's AI Helper entry) opens the panel on arrival.
+  const [showAiSidebar, setShowAiSidebar] = useState(
+    () => searchParams?.get("ai") === "1"
+  );
   const [initialData, setInitialData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
