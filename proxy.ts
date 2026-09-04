@@ -1,18 +1,13 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { clerkMiddleware } from '@clerk/nextjs/server';
 
-const isProtectedRoute = createRouteMatcher([
-  "/dashboard/:path*",
-  "/dashboard",
-])
-
-export default clerkMiddleware(async(auth, req)=> {
-  if(isProtectedRoute(req)) await auth.protect()
-});
+// Auth checks live in the pages/layouts/routes themselves (resource-based),
+// so this only wires Clerk's session into the request.
+export default clerkMiddleware();
 
 export const config = {
   matcher: [
     // Skip Next.js internals and all static files, unless found in search params
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/((?!_next|[^?]*\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     // Always run for Clerk's auto-proxy path
     '/__clerk/:path*',
     // Always run for API routes
